@@ -347,23 +347,26 @@ while (desenvolvedor.status === 'Disponível') {
                             </div>
                             
                             <div class="fade-in-right loading stagger-2">
-                                <form class="glass-strong rounded-xl p-8 space-y-6 relative overflow-hidden">
+                                <form name="contact" method="POST" data-netlify="true" class="glass-strong rounded-xl p-8 space-y-6 relative overflow-hidden">
                                     <!-- Animated border -->
                                     <div class="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-cyan via-accent-magenta to-accent-blue opacity-30 animate-gradient-shift"></div>
                                     <div class="absolute inset-[1px] rounded-xl bg-background-secondary/90 backdrop-blur-sm"></div>
                                     
+                                    <!-- Hidden input for Netlify Forms -->
+                                    <input type="hidden" name="form-name" value="contact">
+                                    
                                     <div class="relative z-10 space-y-6">
                                         <div class="space-y-2">
                                             <label class="text-sm font-medium text-text-dark font-mono" for="name">$ nome --input</label>
-                                            <input class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none font-mono" id="name" placeholder="&gt; seu_nome" type="text"/>
+                                            <input class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none font-mono" id="name" name="name" placeholder="&gt; seu_nome" type="text" required/>
                                         </div>
                                         <div class="space-y-2">
                                             <label class="text-sm font-medium text-text-dark font-mono" for="email">$ email --input</label>
-                                            <input class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none font-mono" id="email" placeholder="&gt; voce@dominio.com" type="email"/>
+                                            <input class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none font-mono" id="email" name="email" placeholder="&gt; voce@dominio.com" type="email" required/>
                                         </div>
                                         <div class="space-y-2">
                                             <label class="text-sm font-medium text-text-dark font-mono" for="message">$ mensagem --input</label>
-                                            <textarea class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none resize-none font-mono" id="message" placeholder="&gt; sua_mensagem_aqui" rows="4"></textarea>
+                                            <textarea class="w-full bg-transparent border-0 border-b-2 border-background-dark focus:border-accent-cyan p-3 text-text-heading-dark transition-all duration-300 focus:outline-none resize-none font-mono" id="message" name="message" placeholder="&gt; sua_mensagem_aqui" rows="4" required></textarea>
                                         </div>
                                         <button class="w-full bg-accent-cyan text-background-dark font-bold py-3 px-6 rounded-lg hover-glow hover-scale transition-all duration-300 font-display relative overflow-hidden group" type="submit">
                                             <span class="relative z-10">$ enviar --mensagem</span>
