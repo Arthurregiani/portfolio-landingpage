@@ -243,16 +243,19 @@
             } catch (error) {
                 console.log(`Tentativa ${attempt + 1} falhou:`, error.message);
                 
-                // Check for certificate/HTTPS related errors
+                // Check for various network/connection errors
                 if (error.message.includes('certificate') || 
                     error.message.includes('SSL') || 
                     error.message.includes('CERT') ||
                     error.message.includes('net::ERR_CERT') ||
+                    error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+                    error.message.includes('ERR_CONNECTION') ||
                     error.name === 'TypeError' && attempt === 0) {
                     
-                    // Show certificate help modal
-                    showCertificateHelp();
-                    throw new Error('Certificado SSL precisa ser aceito');
+                    console.log('Detectado erro de rede/DNS:', error.message);
+                    // Show troubleshooting help modal
+                    showTroubleshootingHelp(error);
+                    throw new Error('Problema de conectividade detectado');
                 }
                 
                 // Don't retry on client errors or abort errors
@@ -292,24 +295,51 @@
         }
     }
     
-    // Show certificate help modal
-    function showCertificateHelp() {
+    // Show troubleshooting help modal
+    function showTroubleshootingHelp(error) {
         // Remove existing modal
-        const existing = document.querySelector('.cert-help-modal');
+        const existing = document.querySelector('.troubleshoot-modal');
         if (existing) existing.remove();
         
         const modal = document.createElement('div');
-        modal.className = 'cert-help-modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        modal.className = 'troubleshoot-modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        
+        let troubleshootContent = '';
+        if (error.message.includes('ERR_NAME_NOT_RESOLVED') || error.message.includes('ERR_CONNECTION')) {
+            troubleshootContent = `
+                <h3 class="text-xl font-bold text-accent-cyan mb-4">🌐 Problema de Conexão</h3>
+                <p class="text-text-dark mb-4">Não foi possível conectar à API. Isso pode ser:</p>
+                <ul class="text-text-dark text-sm mb-4 space-y-1">
+                    <li>• Problema temporário de DNS (aguarde alguns minutos)</li>
+                    <li>• Bloqueio de firewall/antivírus</li>
+                    <li>• Problemas na sua conexão de internet</li>
+                </ul>
+            `;
+        } else {
+            troubleshootContent = `
+                <h3 class="text-xl font-bold text-accent-cyan mb-4">🔒 Problema de Segurança</h3>
+                <p class="text-text-dark mb-4">A API usa certificados SSL confiáveis, mas houve um erro:</p>
+                <ul class="text-text-dark text-sm mb-4 space-y-1">
+                    <li>• Tente recarregar a página (Ctrl+F5)</li>
+                    <li>• Limpe o cache do navegador</li>
+                    <li>• Verifique se não há extensões bloqueando</li>
+                </ul>
+            `;
+        }
+        
         modal.innerHTML = `
             <div class="bg-background-secondary rounded-xl p-6 max-w-md mx-auto glass-strong">
-                <h3 class="text-xl font-bold text-accent-cyan mb-4">🔒 Aceite o Certificado SSL</h3>
-                <p class="text-text-dark mb-4">Para enviar mensagens, você precisa aceitar o certificado SSL da API:</p>
-                <p class="text-text-dark text-sm mb-4">
-                    A API agora usa certificados confiáveis Let's Encrypt. Se ainda houver problemas, tente recarregar a página.
-                </p>
+                ${troubleshootContent}
+                <div class="bg-background-dark rounded p-3 mb-4">
+                    <p class="text-xs font-mono text-accent-green">Erro técnico:</p>
+                    <p class="text-xs font-mono text-text-dark">${error.message}</p>
+                </div>
                 <div class="flex gap-3">
-                    <button class="btn-cert-help bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://arthurlandingapi.duckdns.org/health', '_blank')">
+                    <button class="btn-test-api bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://arthurlandingapi.duckdns.org/health', '_blank')">
                         🔗 Testar API
+                    </button>
+                    <button class="btn-reload bg-accent-green text-background-dark px-4 py-2 rounded font-bold hover:bg-green-600 transition-colors" onclick="location.reload(true)">
+                        🔄 Recarregar
                     </button>
                     <button class="btn-close bg-background-dark text-text-dark px-4 py-2 rounded font-bold hover:bg-gray-600 transition-colors">
                         ✖ Fechar
