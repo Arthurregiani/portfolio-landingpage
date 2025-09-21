@@ -161,23 +161,33 @@
         }
         
         async function testDNS() {
-            updateResult('dns-result', '<span class="loading">Testando todos os endpoints</span>', 'info');
+            updateResult('dns-result', '<span class="loading">Testando conectividade básica</span>', 'info');
             
             let results = [];
             
             for (const endpoint of ENDPOINTS) {
                 try {
                     const start = performance.now();
-                    const response = await fetch(endpoint.baseUrl + '/ping', { method: 'HEAD' });
+                    // Use health endpoint instead of ping for more reliable testing
+                    const response = await fetch(endpoint.baseUrl + '/health', { 
+                        method: 'HEAD',
+                        signal: AbortSignal.timeout(10000) // 10s timeout
+                    });
                     const time = Math.round(performance.now() - start);
                     
                     if (response.ok) {
-                        results.push(`✅ ${endpoint.name}: OK (${time}ms)`);
+                        results.push(`✅ ${endpoint.name}: Conectividade OK (${time}ms)`);
                     } else {
                         results.push(`⚠️ ${endpoint.name}: Status ${response.status} (${time}ms)`);
                     }
                 } catch (error) {
-                    results.push(`❌ ${endpoint.name}: ${error.message}`);
+                    if (error.name === 'AbortError') {
+                        results.push(`❌ ${endpoint.name}: Timeout (>10s)`);
+                    } else if (error.message.includes('NetworkError') || error.message.includes('ERR_')) {
+                        results.push(`❌ ${endpoint.name}: Bloqueado/Inacessível`);
+                    } else {
+                        results.push(`❌ ${endpoint.name}: ${error.message}`);
+                    }
                 }
             }
             
@@ -264,10 +274,15 @@
                     const corsOrigin = response.headers.get('Access-Control-Allow-Origin');
                     const corsMethods = response.headers.get('Access-Control-Allow-Methods');
                     
-                    if (response.ok && (corsOrigin === '*' || corsOrigin === window.location.origin)) {
-                        results.push(`✅ ${endpoint.name}: CORS OK (${corsOrigin})`);
+                    if (response.status === 204 && corsOrigin) {
+                        // 204 No Content is correct for OPTIONS preflight
+                        if (corsOrigin === '*' || corsOrigin === window.location.origin) {
+                            results.push(`✅ ${endpoint.name}: CORS configurado corretamente`);
+                        } else {
+                            results.push(`⚠️ ${endpoint.name}: CORS restritivo (${corsOrigin})`);
+                        }
                     } else {
-                        results.push(`⚠️ ${endpoint.name}: CORS problema (${response.status})`);
+                        results.push(`❌ ${endpoint.name}: CORS mal configurado (${response.status})`);
                     }
                 } catch (error) {
                     results.push(`❌ ${endpoint.name}: ${error.message}`);
