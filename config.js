@@ -17,10 +17,10 @@ const CONFIG = {
   KEEP_ALIVE_ENABLED: false,
   KEEP_ALIVE_INTERVAL: 0, // Disabled
   
-  // Backend configuration - AWS EC2 with HTTPS
-  // Note: Uses self-signed certificate - users need to accept it first
-  BACKEND_URL: 'https://18.228.193.155/api/contact',
-  HEALTH_CHECK_URL: 'https://18.228.193.155/health',
+  // Backend configuration - DuckDNS domain with Let's Encrypt SSL
+  // Professional solution with trusted certificates
+  BACKEND_URL: 'https://arthurlandingapi.duckdns.org/api/contact',
+  HEALTH_CHECK_URL: 'https://arthurlandingapi.duckdns.org/health',
   
   // UI Messages
   MESSAGES: {

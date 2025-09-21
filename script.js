@@ -304,15 +304,12 @@
             <div class="bg-background-secondary rounded-xl p-6 max-w-md mx-auto glass-strong">
                 <h3 class="text-xl font-bold text-accent-cyan mb-4">🔒 Aceite o Certificado SSL</h3>
                 <p class="text-text-dark mb-4">Para enviar mensagens, você precisa aceitar o certificado SSL da API:</p>
-                <ol class="text-text-dark text-sm mb-4 space-y-2">
-                    <li>1. <a href="https://18.228.193.155/health" target="_blank" class="text-accent-cyan hover:underline">Clique aqui para abrir a API</a></li>
-                    <li>2. Clique em "Avançado" quando aparecer o aviso</li>
-                    <li>3. Clique em "Prosseguir para 18.228.193.155"</li>
-                    <li>4. Volte aqui e tente novamente</li>
-                </ol>
+                <p class="text-text-dark text-sm mb-4">
+                    A API agora usa certificados confiáveis Let's Encrypt. Se ainda houver problemas, tente recarregar a página.
+                </p>
                 <div class="flex gap-3">
-                    <button class="btn-cert-help bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://18.228.193.155/health', '_blank')">
-                        🔗 Abrir API
+                    <button class="btn-cert-help bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://arthurlandingapi.duckdns.org/health', '_blank')">
+                        🔗 Testar API
                     </button>
                     <button class="btn-close bg-background-dark text-text-dark px-4 py-2 rounded font-bold hover:bg-gray-600 transition-colors">
                         ✖ Fechar
