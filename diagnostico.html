@@ -116,6 +116,19 @@
             <h2 style="color: #64ffda; margin-bottom: 15px;">📊 Resumo</h2>
             <div id="summary-content"></div>
         </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: rgba(255, 152, 0, 0.1); border: 1px solid #ff9800; border-radius: 10px;">
+            <h3 style="color: #ffb74d; margin-bottom: 15px;">💡 Problemas Comuns</h3>
+            <ul style="color: #e2e8f0; line-height: 1.6;">
+                <li><strong>Direct IP bloqueado:</strong> É normal - firewalls/antivírus bloqueiam IPs da AWS</li>
+                <li><strong>Primeira conexão lenta:</strong> DuckDNS pode levar 2-6s na primeira vez</li>
+                <li><strong>Certificado auto-assinado:</strong> Browsers bloqueiam por segurança</li>
+                <li><strong>Status 204 em CORS:</strong> É correto para OPTIONS preflight</li>
+            </ul>
+            <p style="color: #64ffda; margin-top: 15px;">
+                <strong>Se pelo menos 1 endpoint funcionar, seu formulário está OK!</strong>
+            </p>
+        </div>
     </div>
 
     <script src="config.js"></script>
@@ -204,19 +217,31 @@
             
             for (const endpoint of ENDPOINTS) {
                 try {
-                    const response = await fetch(endpoint.baseUrl + '/ping');
-                    const cert = response.headers.get('strict-transport-security');
+                    // Use health endpoint since it's more reliable
+                    const response = await fetch(endpoint.baseUrl + '/health', {
+                        method: 'HEAD',
+                        signal: AbortSignal.timeout(10000)
+                    });
+                    const hsts = response.headers.get('strict-transport-security');
                     
-                    if (cert) {
-                        results.push(`✅ ${endpoint.name}: SSL válido + HSTS`);
+                    if (response.ok) {
+                        if (hsts) {
+                            results.push(`✅ ${endpoint.name}: SSL válido + HSTS ativo`);
+                        } else {
+                            results.push(`✅ ${endpoint.name}: SSL válido, sem HSTS`);
+                        }
                     } else {
-                        results.push(`⚠️ ${endpoint.name}: SSL funciona, sem HSTS`);
+                        results.push(`⚠️ ${endpoint.name}: SSL conecta, erro ${response.status}`);
                     }
                 } catch (error) {
-                    if (error.message.includes('certificate') || error.message.includes('SSL')) {
-                        results.push(`❌ ${endpoint.name}: Erro de certificado`);
+                    if (error.name === 'AbortError') {
+                        results.push(`❌ ${endpoint.name}: Timeout SSL (>10s)`);
+                    } else if (error.message.includes('certificate') || error.message.includes('SSL') || error.message.includes('CERT')) {
+                        results.push(`❌ ${endpoint.name}: Certificado rejeitado`);
+                    } else if (error.message.includes('NetworkError') || error.message.includes('ERR_')) {
+                        results.push(`❌ ${endpoint.name}: Bloqueado/Inacessível`);
                     } else {
-                        results.push(`❌ ${endpoint.name}: Conexão falhou`);
+                        results.push(`❌ ${endpoint.name}: ${error.message}`);
                     }
                 }
             }
@@ -274,15 +299,23 @@
                     const corsOrigin = response.headers.get('Access-Control-Allow-Origin');
                     const corsMethods = response.headers.get('Access-Control-Allow-Methods');
                     
-                    if (response.status === 204 && corsOrigin) {
-                        // 204 No Content is correct for OPTIONS preflight
-                        if (corsOrigin === '*' || corsOrigin === window.location.origin) {
-                            results.push(`✅ ${endpoint.name}: CORS configurado corretamente`);
+                    // Check if CORS preflight response is correct
+                    if (response.status === 204) {
+                        // 204 No Content is the CORRECT response for OPTIONS preflight
+                        if (corsOrigin && (corsOrigin === '*' || corsOrigin === window.location.origin)) {
+                            const methodsOk = corsMethods && corsMethods.includes('POST');
+                            if (methodsOk) {
+                                results.push(`✅ ${endpoint.name}: CORS perfeito (${corsOrigin})`);
+                            } else {
+                                results.push(`⚠️ ${endpoint.name}: CORS OK, métodos limitados`);
+                            }
                         } else {
-                            results.push(`⚠️ ${endpoint.name}: CORS restritivo (${corsOrigin})`);
+                            results.push(`⚠️ ${endpoint.name}: CORS restritivo (${corsOrigin || 'sem origin'})`);
                         }
+                    } else if (response.ok) {
+                        results.push(`⚠️ ${endpoint.name}: Resposta inesperada (${response.status})`);
                     } else {
-                        results.push(`❌ ${endpoint.name}: CORS mal configurado (${response.status})`);
+                        results.push(`❌ ${endpoint.name}: CORS falhou (${response.status})`);
                     }
                 } catch (error) {
                     results.push(`❌ ${endpoint.name}: ${error.message}`);
