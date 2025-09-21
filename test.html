@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Contact Form</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #fff;
+            margin: 20px;
+        }
+        .form-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #0ff;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+        .notification.success {
+            background: #4caf50;
+        }
+        .notification.error {
+            background: #f44336;
+        }
+        .log {
+            margin-top: 30px;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>🧪 Contact Form Test</h2>
+        <p>This is a simplified test of the contact form functionality.</p>
+        
+        <form>
+            <div class="form-group">
+                <label for="name">Nome:</label>
+                <input type="text" id="name" name="name" value="Test User" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="test@example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Mensagem:</label>
+                <textarea id="message" name="message" required>Esta é uma mensagem de teste para verificar o funcionamento do formulário com timeout e retry logic.</textarea>
+            </div>
+            
+            <button type="submit">$ enviar --mensagem</button>
+        </form>
+        
+        <div class="log" id="log">
+            <strong>📋 Console Log:</strong><br>
+            <em>Os logs aparecerão aqui...</em>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        // Override console.log to also display in the page
+        const logDiv = document.getElementById('log');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        function logToPage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f44336' : type === 'warn' ? '#ff9800' : '#0ff';
+            logDiv.innerHTML += `<div style="color: ${color}; margin: 2px 0;">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            logToPage(args.join(' '), 'info');
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            logToPage('ERROR: ' + args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            logToPage('WARN: ' + args.join(' '), 'warn');
+        };
+        
+        // Show notification function (copied from main script)
+        function showNotification(message, type = 'info') {
+            // Remove existing notifications
+            const existing = document.querySelector('.notification');
+            if (existing) existing.remove();
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+        
+        console.log('🚀 Test page loaded');
+        console.log('📋 Config loaded:', CONFIG ? 'Yes' : 'No');
+        if (CONFIG) {
+            console.log('⚙️  REQUEST_TIMEOUT_MS:', CONFIG.REQUEST_TIMEOUT_MS);
+            console.log('⚙️  MAX_RETRIES:', CONFIG.MAX_RETRIES);
+            console.log('⚙️  KEEP_ALIVE_ENABLED:', CONFIG.KEEP_ALIVE_ENABLED);
+        }
+    </script>
+    <script>
+        // Fetch with configurable timeout using AbortController (copied from main script)
+        async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
+        }
+        
+        // Enhanced form submission with timeout and retry logic (copied from main script)
+        async function submitFormWithRetry(data, button) {
+            let attempt = 0;
+            
+            while (attempt <= CONFIG.MAX_RETRIES) {
+                try {
+                    // Update button text based on attempt
+                    if (attempt === 0) {
+                        button.innerHTML = CONFIG.MESSAGES.COLD_START_WARNING;
+                    } else {
+                        button.innerHTML = CONFIG.MESSAGES.RETRYING(attempt, CONFIG.MAX_RETRIES);
+                    }
+                    button.disabled = true;
+                    
+                    console.log(`🔄 Tentativa ${attempt + 1}/${CONFIG.MAX_RETRIES + 1}...`);
+                    
+                    const response = await fetchWithTimeout(CONFIG.BACKEND_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    }, CONFIG.REQUEST_TIMEOUT_MS);
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        console.log('✅ Resposta bem-sucedida:', result);
+                        return result;
+                    } else if (response.status >= 400 && response.status < 500) {
+                        // Client errors (4xx) - don't retry
+                        console.error('❌ Erro do cliente (4xx):', response.status, result);
+                        throw new Error(result.message || 'Erro na requisição');
+                    } else {
+                        // Server errors (5xx) - retry
+                        console.warn('⚠️  Erro do servidor (5xx):', response.status, result);
+                        throw new Error(result.message || 'Erro no servidor');
+                    }
+                    
+                } catch (error) {
+                    console.log(`❌ Tentativa ${attempt + 1} falhou:`, error.message);
+                    
+                    // Don't retry on client errors or abort errors
+                    if (error.name === 'AbortError' || (error.message && error.message.includes('na requisição'))) {
+                        console.error('🚫 Não tentando novamente:', error.name);
+                        throw error;
+                    }
+                    
+                    attempt++;
+                    
+                    // If we have more attempts, wait before retrying
+                    if (attempt <= CONFIG.MAX_RETRIES) {
+                        const delay = CONFIG.RETRY_DELAYS[attempt - 1] || 5000;
+                        console.log(`⏰ Aguardando ${delay}ms antes da próxima tentativa...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        console.error('💥 Todas as tentativas falharam');
+                        throw error; // Final attempt failed
+                    }
+                }
+            }
+        }
+        
+        // Form submission (copied from main script)
+        function initFormSubmission() {
+            const form = document.querySelector('form');
+            if (!form) return;
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const button = e.target.querySelector('button');
+                if (!button) return;
+                
+                const formData = new FormData(e.target);
+                const data = {
+                    name: formData.get('name'),
+                    email: formData.get('email'),
+                    message: formData.get('message')
+                };
+                
+                console.log('📝 Dados do formulário:', data);
+                
+                // Validation
+                if (!data.name || !data.email || !data.message) {
+                    showNotification('❌ Por favor, preencha todos os campos', 'error');
+                    return;
+                }
+                
+                const originalText = button.innerHTML;
+                
+                try {
+                    const result = await submitFormWithRetry(data, button);
+                    
+                    if (result.success) {
+                        button.innerHTML = CONFIG.MESSAGES.SUCCESS;
+                        showNotification('✅ ' + result.message, 'success');
+                        console.log('🎉 Formulário enviado com sucesso!');
+                        // Don't reset form in test to keep data
+                    } else {
+                        throw new Error(result.message || 'Erro ao enviar mensagem');
+                    }
+                    
+                } catch (error) {
+                    console.error('💥 Erro ao enviar formulário:', error);
+                    button.innerHTML = CONFIG.MESSAGES.ERROR;
+                    
+                    if (error.name === 'AbortError') {
+                        showNotification('❌ Tempo limite excedido. O servidor pode estar inicializando.', 'error');
+                    } else {
+                        showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
+                    }
+                } finally {
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.disabled = false;
+                    }, 3000);
+                }
+            });
+        }
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initFormSubmission);
+        } else {
+            initFormSubmission();
+        }
+        
+        console.log('✅ Test form initialized');
+    </script>
+</body>
+</html>

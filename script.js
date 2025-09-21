@@ -152,7 +152,7 @@
         });
     }
 
-    // Form submission with backend API
+    // Form submission with robust cold-start handling
     function initFormSubmission() {
         const form = document.querySelector('form');
         if (!form) return;
@@ -178,24 +178,10 @@
             const originalText = button.innerHTML;
             
             try {
-                button.innerHTML = '<span class="relative z-10">$ enviando...</span>';
-                button.disabled = true;
+                const result = await submitFormWithRetry(data, button);
                 
-                // Backend URL - deployed on Render
-                const BACKEND_URL = 'https://landingpage-backend-rw9p.onrender.com/api/contact';
-                
-                const response = await fetch(BACKEND_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    button.innerHTML = '<span class="relative z-10">$ enviado ✓</span>';
+                if (result.success) {
+                    button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.SUCCESS}</span>`;
                     showNotification('✅ ' + result.message, 'success');
                     e.target.reset();
                 } else {
@@ -204,8 +190,13 @@
                 
             } catch (error) {
                 console.error('Erro ao enviar formulário:', error);
-                button.innerHTML = '<span class="relative z-10">$ erro ✗</span>';
-                showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
+                button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.ERROR}</span>`;
+                
+                if (error.name === 'AbortError') {
+                    showNotification('❌ Tempo limite excedido. O servidor pode estar inicializando.', 'error');
+                } else {
+                    showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
+                }
             } finally {
                 setTimeout(() => {
                     button.innerHTML = originalText;
@@ -213,6 +204,80 @@
                 }, 3000);
             }
         });
+    }
+    
+    // Enhanced form submission with timeout and retry logic
+    async function submitFormWithRetry(data, button) {
+        let attempt = 0;
+        
+        while (attempt <= CONFIG.MAX_RETRIES) {
+            try {
+                // Update button text based on attempt
+                if (attempt === 0) {
+                    button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.COLD_START_WARNING}</span>`;
+                } else {
+                    button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.RETRYING(attempt, CONFIG.MAX_RETRIES)}</span>`;
+                }
+                button.disabled = true;
+                
+                const response = await fetchWithTimeout(CONFIG.BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }, CONFIG.REQUEST_TIMEOUT_MS);
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    return result;
+                } else if (response.status >= 400 && response.status < 500) {
+                    // Client errors (4xx) - don't retry
+                    throw new Error(result.message || 'Erro na requisição');
+                } else {
+                    // Server errors (5xx) - retry
+                    throw new Error(result.message || 'Erro no servidor');
+                }
+                
+            } catch (error) {
+                console.log(`Tentativa ${attempt + 1} falhou:`, error.message);
+                
+                // Don't retry on client errors or abort errors
+                if (error.name === 'AbortError' || (error.message && error.message.includes('na requisição'))) {
+                    throw error;
+                }
+                
+                attempt++;
+                
+                // If we have more attempts, wait before retrying
+                if (attempt <= CONFIG.MAX_RETRIES) {
+                    const delay = CONFIG.RETRY_DELAYS[attempt - 1] || 5000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw error; // Final attempt failed
+                }
+            }
+        }
+    }
+    
+    // Fetch with configurable timeout using AbortController
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }
     
     // Show notification function
@@ -302,6 +367,36 @@
             }, 300);
         }, 10000);
     }
+    
+    // Keep-alive mechanism to prevent server cold starts
+    function initKeepAlive() {
+        if (!CONFIG.KEEP_ALIVE_ENABLED) return;
+        
+        console.log('🔄 Keep-alive ativado - ping a cada', CONFIG.KEEP_ALIVE_INTERVAL / 1000 / 60, 'minutos');
+        
+        const pingServer = async () => {
+            try {
+                const response = await fetchWithTimeout(CONFIG.HEALTH_CHECK_URL, {
+                    method: 'GET',
+                    headers: { 'Cache-Control': 'no-cache' }
+                }, 10000); // 10 second timeout for keep-alive
+                
+                if (response.ok) {
+                    console.log('🟢 Keep-alive ping successful');
+                } else {
+                    console.warn('🟡 Keep-alive ping failed:', response.status);
+                }
+            } catch (error) {
+                console.warn('🟡 Keep-alive ping error:', error.message);
+            }
+        };
+        
+        // Initial ping after 1 minute (let page load first)
+        setTimeout(pingServer, 60000);
+        
+        // Set up regular interval
+        setInterval(pingServer, CONFIG.KEEP_ALIVE_INTERVAL);
+    }
 
     // Initialize everything when DOM is loaded
     function init() {
@@ -327,6 +422,7 @@
         initFormSubmission();
         initSkillTagGlitch();
         initRandomGlitchEffect();
+        initKeepAlive();
     }
 
     // Wait for DOM to be ready
