@@ -17,9 +17,10 @@ const CONFIG = {
   KEEP_ALIVE_ENABLED: false,
   KEEP_ALIVE_INTERVAL: 0, // Disabled
   
-  // Backend configuration - AWS EC2
-  BACKEND_URL: 'http://18.228.193.155/api/contact',
-  HEALTH_CHECK_URL: 'http://18.228.193.155/health',
+  // Backend configuration - AWS EC2 with HTTPS
+  // Note: Certificate is self-signed, may require manual browser acceptance
+  BACKEND_URL: 'https://18.228.193.155/api/contact',
+  HEALTH_CHECK_URL: 'https://18.228.193.155/health',
   
   // UI Messages
   MESSAGES: {
