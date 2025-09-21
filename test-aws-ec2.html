@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste AWS EC2 Backend - Landing Page</title>
+    <script src="config.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #111;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #1a4a1a;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+        
+        .status.error {
+            background: #4a1a1a;
+            border: 1px solid #ff4141;
+            color: #ff4141;
+        }
+        
+        .status.info {
+            background: #1a1a4a;
+            border: 1px solid #4141ff;
+            color: #4141ff;
+        }
+        
+        button {
+            background: #222;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button:hover {
+            background: #00ff41;
+            color: #000;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .form-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00ff41;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            background: #222;
+            color: #00ff41;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            box-sizing: border-box;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #00ff41;
+            box-shadow: 0 0 5px #00ff41;
+        }
+        
+        .info-box {
+            background: #1a1a1a;
+            padding: 15px;
+            border-left: 4px solid #00ff41;
+            margin: 20px 0;
+        }
+        
+        .json-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Teste AWS EC2 Backend</h1>
+        
+        <div class="info-box">
+            <strong>Configuração Atual:</strong><br>
+            Backend URL: <span id="backend-url"></span><br>
+            Health URL: <span id="health-url"></span><br>
+            Timeout: <span id="timeout"></span>s<br>
+            Keep-alive: <span id="keep-alive"></span>
+        </div>
+        
+        <div id="status-container"></div>
+        
+        <button onclick="testHealthCheck()">🔍 Testar Health Check</button>
+        <button onclick="testCORS()">🌐 Testar CORS</button>
+        <button onclick="clearResults()">🗑️ Limpar</button>
+        
+        <div class="info-box">
+            <strong>Teste de Formulário:</strong>
+        </div>
+        
+        <form id="test-form">
+            <div class="form-group">
+                <label for="name">Nome:</label>
+                <input type="text" id="name" name="name" value="Teste Frontend AWS" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="teste@exemplo.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Mensagem:</label>
+                <textarea id="message" name="message" rows="4" required>Esta é uma mensagem de teste da integração frontend → AWS EC2 backend!</textarea>
+            </div>
+            
+            <button type="submit">📧 Enviar Teste</button>
+        </form>
+        
+        <div id="results" class="json-output" style="margin-top: 20px; min-height: 100px;"></div>
+    </div>
+
+    <script>
+        // Display current config
+        document.getElementById('backend-url').textContent = CONFIG.BACKEND_URL;
+        document.getElementById('health-url').textContent = CONFIG.HEALTH_CHECK_URL;
+        document.getElementById('timeout').textContent = CONFIG.REQUEST_TIMEOUT_MS / 1000;
+        document.getElementById('keep-alive').textContent = CONFIG.KEEP_ALIVE_ENABLED ? 'Habilitado' : 'Desabilitado';
+        
+        function addStatus(message, type) {
+            const container = document.getElementById('status-container');
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            container.appendChild(status);
+            
+            // Keep only last 10 status messages
+            while (container.children.length > 10) {
+                container.removeChild(container.firstChild);
+            }
+        }
+        
+        function updateResults(data) {
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').textContent = '';
+            document.getElementById('status-container').innerHTML = '';
+        }
+        
+        async function testHealthCheck() {
+            addStatus('Testando health check...', 'info');
+            
+            try {
+                const response = await fetch(CONFIG.HEALTH_CHECK_URL, {
+                    method: 'GET',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addStatus('✅ Health check OK', 'success');
+                    updateResults(data);
+                } else {
+                    addStatus(`❌ Health check falhou: ${response.status}`, 'error');
+                    updateResults(data);
+                }
+            } catch (error) {
+                addStatus(`❌ Erro no health check: ${error.message}`, 'error');
+                updateResults({ error: error.message });
+            }
+        }
+        
+        async function testCORS() {
+            addStatus('Testando CORS...', 'info');
+            
+            try {
+                const response = await fetch(CONFIG.BACKEND_URL, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': 'http://localhost',
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type'
+                    }
+                });
+                
+                if (response.ok || response.status === 204) {
+                    addStatus('✅ CORS OK', 'success');
+                    updateResults({
+                        cors: 'OK',
+                        status: response.status,
+                        headers: Object.fromEntries([...response.headers.entries()])
+                    });
+                } else {
+                    addStatus(`⚠️ CORS response: ${response.status}`, 'info');
+                    updateResults({
+                        cors: 'Warning',
+                        status: response.status,
+                        headers: Object.fromEntries([...response.headers.entries()])
+                    });
+                }
+            } catch (error) {
+                addStatus(`❌ Erro no teste CORS: ${error.message}`, 'error');
+                updateResults({ error: error.message });
+            }
+        }
+        
+        document.getElementById('test-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                message: formData.get('message')
+            };
+            
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            
+            addStatus('Enviando formulário...', 'info');
+            submitButton.disabled = true;
+            submitButton.textContent = '📤 Enviando...';
+            
+            try {
+                const response = await fetch(CONFIG.BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    addStatus('✅ Formulário enviado com sucesso!', 'success');
+                    updateResults(result);
+                } else {
+                    addStatus(`❌ Erro no formulário: ${result.message || 'Erro desconhecido'}`, 'error');
+                    updateResults(result);
+                }
+            } catch (error) {
+                addStatus(`❌ Erro de rede: ${error.message}`, 'error');
+                updateResults({ error: error.message });
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
+            }
+        });
+        
+        // Auto-test on page load
+        setTimeout(() => {
+            testHealthCheck();
+        }, 1000);
+    </script>
+</body>
+</html>

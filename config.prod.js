@@ -1,19 +1,19 @@
 /**
- * Frontend Configuration
+ * Production Configuration for AWS EC2 Backend
  * 
- * Handles cold-start delays from free-tier hosting services like Render/Railway
- * that can take 30-60 seconds to "wake up" after inactivity periods.
+ * Optimized for AWS EC2 deployment - no cold-start delays,
+ * faster timeouts, and disabled keep-alive functionality.
  */
 
 const CONFIG = {
-  // Request timeout configuration (AWS EC2 - no cold start)
-  REQUEST_TIMEOUT_MS: 30000, // 30 seconds - EC2 always running
+  // Request timeout configuration (AWS EC2 - always running)
+  REQUEST_TIMEOUT_MS: 30000, // 30 seconds
   
   // Retry configuration for failed requests
   MAX_RETRIES: 1,
   RETRY_DELAYS: [1000], // Single retry after 1s
   
-  // Keep-alive (disabled for AWS EC2 - always running)
+  // Keep-alive (disabled for AWS EC2 - server always running)
   KEEP_ALIVE_ENABLED: false,
   KEEP_ALIVE_INTERVAL: 0, // Disabled
   
