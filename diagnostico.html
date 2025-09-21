@@ -118,8 +118,20 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        const API_BASE = 'https://arthurlandingapi.duckdns.org';
+        const ENDPOINTS = [
+            {
+                name: 'DuckDNS + Let\'s Encrypt',
+                baseUrl: 'https://arthurlandingapi.duckdns.org',
+                priority: 1
+            },
+            {
+                name: 'Direct IP + Self-signed',
+                baseUrl: 'https://18.228.193.155',
+                priority: 2
+            }
+        ];
         let results = {};
 
         async function runDiagnostics() {
@@ -149,21 +161,30 @@
         }
         
         async function testDNS() {
-            updateResult('dns-result', '<span class="loading">Resolvendo DNS</span>', 'info');
+            updateResult('dns-result', '<span class="loading">Testando todos os endpoints</span>', 'info');
             
-            try {
-                const start = performance.now();
-                const response = await fetch(API_BASE + '/ping', { method: 'HEAD' });
-                const time = Math.round(performance.now() - start);
-                
-                if (response.ok) {
-                    updateResult('dns-result', `✅ DNS resolvido com sucesso (${time}ms)`, 'success');
-                } else {
-                    updateResult('dns-result', `⚠️ DNS resolvido, mas servidor retornou ${response.status}`, 'warning');
+            let results = [];
+            
+            for (const endpoint of ENDPOINTS) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(endpoint.baseUrl + '/ping', { method: 'HEAD' });
+                    const time = Math.round(performance.now() - start);
+                    
+                    if (response.ok) {
+                        results.push(`✅ ${endpoint.name}: OK (${time}ms)`);
+                    } else {
+                        results.push(`⚠️ ${endpoint.name}: Status ${response.status} (${time}ms)`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${endpoint.name}: ${error.message}`);
                 }
-            } catch (error) {
-                updateResult('dns-result', `❌ Falha na resolução DNS: ${error.message}`, 'error');
             }
+            
+            const successCount = results.filter(r => r.includes('✅')).length;
+            const type = successCount > 0 ? (successCount === ENDPOINTS.length ? 'success' : 'warning') : 'error';
+            
+            updateResult('dns-result', results.join('<br>'), type);
         }
         
         async function testSSL() {

@@ -17,8 +17,27 @@ const CONFIG = {
   KEEP_ALIVE_ENABLED: false,
   KEEP_ALIVE_INTERVAL: 0, // Disabled
   
-  // Backend configuration - DuckDNS domain with Let's Encrypt SSL
-  // Professional solution with trusted certificates
+  // Backend configuration - Multiple endpoints for maximum reliability
+  // Primary: DuckDNS with Let's Encrypt (preferred)
+  // Fallback: Direct IP with self-signed certificate
+  BACKEND_ENDPOINTS: [
+    {
+      name: 'DuckDNS + Let\'s Encrypt (Preferred)',
+      baseUrl: 'https://arthurlandingapi.duckdns.org',
+      contactUrl: 'https://arthurlandingapi.duckdns.org/api/contact',
+      healthUrl: 'https://arthurlandingapi.duckdns.org/health',
+      priority: 1
+    },
+    {
+      name: 'Direct IP + Self-signed (Fallback)',
+      baseUrl: 'https://18.228.193.155',
+      contactUrl: 'https://18.228.193.155/api/contact', 
+      healthUrl: 'https://18.228.193.155/health',
+      priority: 2
+    }
+  ],
+  
+  // Legacy config for compatibility
   BACKEND_URL: 'https://arthurlandingapi.duckdns.org/api/contact',
   HEALTH_CHECK_URL: 'https://arthurlandingapi.duckdns.org/health',
   

@@ -206,21 +206,53 @@
         });
     }
     
-    // Enhanced form submission with timeout and retry logic
+    // Smart endpoint selection with automatic fallback
+    async function getWorkingEndpoint() {
+        if (!CONFIG.BACKEND_ENDPOINTS) {
+            return { contactUrl: CONFIG.BACKEND_URL, healthUrl: CONFIG.HEALTH_CHECK_URL };
+        }
+        
+        // Try endpoints in priority order
+        for (const endpoint of CONFIG.BACKEND_ENDPOINTS.sort((a, b) => a.priority - b.priority)) {
+            try {
+                console.log(`Testing endpoint: ${endpoint.name}`);
+                const response = await fetchWithTimeout(endpoint.healthUrl, { method: 'HEAD' }, 5000);
+                if (response.ok) {
+                    console.log(`✅ Selected working endpoint: ${endpoint.name}`);
+                    return endpoint;
+                }
+            } catch (error) {
+                console.log(`❌ Endpoint failed: ${endpoint.name} - ${error.message}`);
+                continue;
+            }
+        }
+        
+        // If all endpoints fail, return the first one as last resort
+        console.log('⚠️ All endpoints failed, using primary as fallback');
+        return CONFIG.BACKEND_ENDPOINTS[0];
+    }
+    
+    // Enhanced form submission with intelligent endpoint selection
     async function submitFormWithRetry(data, button) {
         let attempt = 0;
+        let selectedEndpoint = null;
         
         while (attempt <= CONFIG.MAX_RETRIES) {
             try {
-                // Update button text based on attempt
+                // Select working endpoint on first attempt
                 if (attempt === 0) {
+                    button.innerHTML = `<span class="relative z-10">$ selecionando melhor servidor...</span>`;
+                    selectedEndpoint = await getWorkingEndpoint();
                     button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.COLD_START_WARNING}</span>`;
                 } else {
                     button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.RETRYING(attempt, CONFIG.MAX_RETRIES)}</span>`;
                 }
                 button.disabled = true;
                 
-                const response = await fetchWithTimeout(CONFIG.BACKEND_URL, {
+                const contactUrl = selectedEndpoint ? selectedEndpoint.contactUrl : CONFIG.BACKEND_URL;
+                console.log(`Sending form to: ${contactUrl}`);
+                
+                const response = await fetchWithTimeout(contactUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
