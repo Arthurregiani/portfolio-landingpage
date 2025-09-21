@@ -152,31 +152,103 @@
         });
     }
 
-    // Form submission with animation
+    // Form submission with backend API
     function initFormSubmission() {
         const form = document.querySelector('form');
         if (!form) return;
         
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const button = e.target.querySelector('button');
             if (!button) return;
             
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                message: formData.get('message')
+            };
+            
+            // Validation
+            if (!data.name || !data.email || !data.message) {
+                showNotification('❌ Por favor, preencha todos os campos', 'error');
+                return;
+            }
+            
             const originalText = button.innerHTML;
             
-            button.innerHTML = '<span class="relative z-10">$ sending...</span>';
-            button.disabled = true;
-            
-            setTimeout(() => {
-                button.innerHTML = '<span class="relative z-10">$ sent ✓</span>';
+            try {
+                button.innerHTML = '<span class="relative z-10">$ enviando...</span>';
+                button.disabled = true;
+                
+                // Backend URL - deployed on Render
+                const BACKEND_URL = 'https://landingpage-backend-rw9p.onrender.com/api/contact';
+                
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    button.innerHTML = '<span class="relative z-10">$ enviado ✓</span>';
+                    showNotification('✅ ' + result.message, 'success');
+                    e.target.reset();
+                } else {
+                    throw new Error(result.message || 'Erro ao enviar mensagem');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao enviar formulário:', error);
+                button.innerHTML = '<span class="relative z-10">$ erro ✗</span>';
+                showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
+            } finally {
                 setTimeout(() => {
                     button.innerHTML = originalText;
                     button.disabled = false;
-                    // Reset form
-                    e.target.reset();
-                }, 2000);
-            }, 1500);
+                }, 3000);
+            }
         });
+    }
+    
+    // Show notification function
+    function showNotification(message, type = 'info') {
+        // Remove existing notifications
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
+        
+        const notification = document.createElement('div');
+        notification.className = `notification fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg font-mono text-sm max-w-sm transition-all duration-300 transform translate-x-full`;
+        
+        if (type === 'success') {
+            notification.classList.add('bg-accent-green', 'text-background-dark');
+        } else if (type === 'error') {
+            notification.classList.add('bg-red-500', 'text-white');
+        } else {
+            notification.classList.add('bg-accent-cyan', 'text-background-dark');
+        }
+        
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 5000);
     }
 
     // Glitch effect for skill tags
