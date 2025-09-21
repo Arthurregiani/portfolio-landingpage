@@ -178,7 +178,8 @@
             const originalText = button.innerHTML;
             
             try {
-                const result = await submitFormWithRetry(data, button);
+                // Use simple direct approach like the test page
+                const result = await submitFormDirect(data, button);
                 
                 if (result.success) {
                     button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.SUCCESS}</span>`;
@@ -194,16 +195,67 @@
                 
                 if (error.name === 'AbortError') {
                     showNotification('❌ Tempo limite excedido. O servidor pode estar inicializando.', 'error');
+                } else if (error.message.includes('certificate') || error.message.includes('NetworkError')) {
+                    showTroubleshootingHelp(error);
                 } else {
                     showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
                 }
-            } finally {
+            }
                 setTimeout(() => {
                     button.innerHTML = originalText;
                     button.disabled = false;
                 }, 3000);
             }
         });
+    }
+    
+    // Simple direct form submission (same logic as working test page)
+    async function submitFormDirect(data, button) {
+        const endpoints = [
+            'https://arthurlandingapi.duckdns.org/api/contact',
+            'https://18.228.193.155/api/contact'
+        ];
+        
+        button.innerHTML = `<span class="relative z-10">$ enviando...</span>`;
+        button.disabled = true;
+        
+        // Try each endpoint until one works
+        for (let i = 0; i < endpoints.length; i++) {
+            const endpoint = endpoints[i];
+            const endpointName = i === 0 ? 'DuckDNS + Let\'s Encrypt' : 'Direct IP + Self-signed';
+            
+            try {
+                console.log(`Trying ${endpointName}: ${endpoint}`);
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    console.warn(`${endpointName} failed with status ${response.status}`);
+                    continue; // Try next endpoint
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Success with ${endpointName}:`, result);
+                return result;
+                
+            } catch (error) {
+                console.error(`${endpointName} failed:`, error.message);
+                
+                if (i === endpoints.length - 1) {
+                    // Last endpoint failed, throw error
+                    throw new Error(`Todos os endpoints falharam. Último erro: ${error.message}`);
+                }
+                // Continue to next endpoint
+            }
+        }
+        
+        throw new Error('Nenhum endpoint funcionou');
     }
     
     // Smart endpoint selection with automatic fallback
