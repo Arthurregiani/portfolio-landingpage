@@ -190,100 +190,136 @@
         async function testSSL() {
             updateResult('ssl-result', '<span class="loading">Verificando certificado SSL</span>', 'info');
             
-            try {
-                const response = await fetch(API_BASE + '/ping');
-                const cert = response.headers.get('strict-transport-security');
-                
-                if (cert) {
-                    updateResult('ssl-result', '✅ Certificado SSL válido e configurado (HSTS ativo)', 'success');
-                } else {
-                    updateResult('ssl-result', '⚠️ HTTPS funciona, mas HSTS não detectado', 'warning');
-                }
-            } catch (error) {
-                if (error.message.includes('certificate') || error.message.includes('SSL')) {
-                    updateResult('ssl-result', `❌ Erro de certificado SSL: ${error.message}`, 'error');
-                } else {
-                    updateResult('ssl-result', '⚠️ Não foi possível verificar SSL (conexão falhou)', 'warning');
+            let results = [];
+            
+            for (const endpoint of ENDPOINTS) {
+                try {
+                    const response = await fetch(endpoint.baseUrl + '/ping');
+                    const cert = response.headers.get('strict-transport-security');
+                    
+                    if (cert) {
+                        results.push(`✅ ${endpoint.name}: SSL válido + HSTS`);
+                    } else {
+                        results.push(`⚠️ ${endpoint.name}: SSL funciona, sem HSTS`);
+                    }
+                } catch (error) {
+                    if (error.message.includes('certificate') || error.message.includes('SSL')) {
+                        results.push(`❌ ${endpoint.name}: Erro de certificado`);
+                    } else {
+                        results.push(`❌ ${endpoint.name}: Conexão falhou`);
+                    }
                 }
             }
+            
+            const successCount = results.filter(r => r.includes('✅')).length;
+            const type = successCount > 0 ? (successCount === ENDPOINTS.length ? 'success' : 'warning') : 'error';
+            
+            updateResult('ssl-result', results.join('<br>'), type);
         }
         
         async function testHealthCheck() {
             updateResult('health-result', '<span class="loading">Testando health check</span>', 'info');
             
-            try {
-                const start = performance.now();
-                const response = await fetch(API_BASE + '/health');
-                const time = Math.round(performance.now() - start);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    updateResult('health-result', `✅ API online (${time}ms) - Status: ${data.status || 'OK'}`, 'success');
-                } else {
-                    updateResult('health-result', `❌ API retornou erro ${response.status}: ${response.statusText}`, 'error');
+            let results = [];
+            
+            for (const endpoint of ENDPOINTS) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(endpoint.baseUrl + '/health');
+                    const time = Math.round(performance.now() - start);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        results.push(`✅ ${endpoint.name}: Online (${time}ms) - ${data.status || 'OK'}`);
+                    } else {
+                        results.push(`❌ ${endpoint.name}: Erro ${response.status} (${time}ms)`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${endpoint.name}: ${error.message}`);
                 }
-            } catch (error) {
-                updateResult('health-result', `❌ Falha na conexão com a API: ${error.message}`, 'error');
             }
+            
+            const successCount = results.filter(r => r.includes('✅')).length;
+            const type = successCount > 0 ? (successCount === ENDPOINTS.length ? 'success' : 'warning') : 'error';
+            
+            updateResult('health-result', results.join('<br>'), type);
         }
         
         async function testCORS() {
             updateResult('cors-result', '<span class="loading">Verificando CORS</span>', 'info');
             
-            try {
-                const response = await fetch(API_BASE + '/api/contact', {
-                    method: 'OPTIONS',
-                    headers: {
-                        'Origin': window.location.origin,
-                        'Access-Control-Request-Method': 'POST',
-                        'Access-Control-Request-Headers': 'Content-Type'
+            let results = [];
+            
+            for (const endpoint of ENDPOINTS) {
+                try {
+                    const response = await fetch(endpoint.baseUrl + '/api/contact', {
+                        method: 'OPTIONS',
+                        headers: {
+                            'Origin': window.location.origin,
+                            'Access-Control-Request-Method': 'POST',
+                            'Access-Control-Request-Headers': 'Content-Type'
+                        }
+                    });
+                    
+                    const corsOrigin = response.headers.get('Access-Control-Allow-Origin');
+                    const corsMethods = response.headers.get('Access-Control-Allow-Methods');
+                    
+                    if (response.ok && (corsOrigin === '*' || corsOrigin === window.location.origin)) {
+                        results.push(`✅ ${endpoint.name}: CORS OK (${corsOrigin})`);
+                    } else {
+                        results.push(`⚠️ ${endpoint.name}: CORS problema (${response.status})`);
                     }
-                });
-                
-                const corsOrigin = response.headers.get('Access-Control-Allow-Origin');
-                const corsMethods = response.headers.get('Access-Control-Allow-Methods');
-                
-                if (response.ok && (corsOrigin === '*' || corsOrigin === window.location.origin)) {
-                    updateResult('cors-result', `✅ CORS configurado corretamente<br>Origin: ${corsOrigin}<br>Methods: ${corsMethods}`, 'success');
-                } else {
-                    updateResult('cors-result', `⚠️ CORS pode estar mal configurado<br>Status: ${response.status}<br>Origin: ${corsOrigin || 'N/A'}`, 'warning');
+                } catch (error) {
+                    results.push(`❌ ${endpoint.name}: ${error.message}`);
                 }
-            } catch (error) {
-                updateResult('cors-result', `❌ Erro ao verificar CORS: ${error.message}`, 'error');
             }
+            
+            const successCount = results.filter(r => r.includes('✅')).length;
+            const type = successCount > 0 ? (successCount === ENDPOINTS.length ? 'success' : 'warning') : 'error';
+            
+            updateResult('cors-result', results.join('<br>'), type);
         }
         
         async function testContactForm() {
             updateResult('form-result', '<span class="loading">Testando envio de formulário</span>', 'info');
             
-            try {
-                const testData = {
-                    name: 'Teste Diagnóstico',
-                    email: 'diagnostico@teste.com',
-                    message: 'Esta é uma mensagem de teste automático do sistema de diagnóstico.'
-                };
-                
-                const start = performance.now();
-                const response = await fetch(API_BASE + '/api/contact', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Origin': window.location.origin
-                    },
-                    body: JSON.stringify(testData)
-                });
-                const time = Math.round(performance.now() - start);
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    updateResult('form-result', `✅ Formulário funciona perfeitamente! (${time}ms)<br>Resposta: ${result.message || 'Sucesso'}`, 'success');
-                } else {
-                    const errorText = await response.text();
-                    updateResult('form-result', `❌ Erro no formulário (${response.status}): ${errorText}`, 'error');
+            const testData = {
+                name: 'Teste Diagnóstico',
+                email: 'diagnostico@teste.com',
+                message: 'Esta é uma mensagem de teste automático do sistema de diagnóstico.'
+            };
+            
+            let results = [];
+            
+            for (const endpoint of ENDPOINTS) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(endpoint.baseUrl + '/api/contact', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Origin': window.location.origin
+                        },
+                        body: JSON.stringify(testData)
+                    });
+                    const time = Math.round(performance.now() - start);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        results.push(`✅ ${endpoint.name}: Formulário OK (${time}ms)`);
+                    } else {
+                        const errorText = await response.text();
+                        results.push(`❌ ${endpoint.name}: Erro ${response.status} (${time}ms)`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${endpoint.name}: ${error.message}`);
                 }
-            } catch (error) {
-                updateResult('form-result', `❌ Falha crítica no formulário: ${error.message}`, 'error');
             }
+            
+            const successCount = results.filter(r => r.includes('✅')).length;
+            const type = successCount > 0 ? (successCount === ENDPOINTS.length ? 'success' : 'warning') : 'error';
+            
+            updateResult('form-result', results.join('<br>'), type);
         }
         
         function showSummary() {
