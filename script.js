@@ -243,6 +243,18 @@
             } catch (error) {
                 console.log(`Tentativa ${attempt + 1} falhou:`, error.message);
                 
+                // Check for certificate/HTTPS related errors
+                if (error.message.includes('certificate') || 
+                    error.message.includes('SSL') || 
+                    error.message.includes('CERT') ||
+                    error.message.includes('net::ERR_CERT') ||
+                    error.name === 'TypeError' && attempt === 0) {
+                    
+                    // Show certificate help modal
+                    showCertificateHelp();
+                    throw new Error('Certificado SSL precisa ser aceito');
+                }
+                
                 // Don't retry on client errors or abort errors
                 if (error.name === 'AbortError' || (error.message && error.message.includes('na requisição'))) {
                     throw error;
@@ -278,6 +290,50 @@
             clearTimeout(timeoutId);
             throw error;
         }
+    }
+    
+    // Show certificate help modal
+    function showCertificateHelp() {
+        // Remove existing modal
+        const existing = document.querySelector('.cert-help-modal');
+        if (existing) existing.remove();
+        
+        const modal = document.createElement('div');
+        modal.className = 'cert-help-modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-background-secondary rounded-xl p-6 max-w-md mx-auto glass-strong">
+                <h3 class="text-xl font-bold text-accent-cyan mb-4">🔒 Aceite o Certificado SSL</h3>
+                <p class="text-text-dark mb-4">Para enviar mensagens, você precisa aceitar o certificado SSL da API:</p>
+                <ol class="text-text-dark text-sm mb-4 space-y-2">
+                    <li>1. <a href="https://18.228.193.155/health" target="_blank" class="text-accent-cyan hover:underline">Clique aqui para abrir a API</a></li>
+                    <li>2. Clique em "Avançado" quando aparecer o aviso</li>
+                    <li>3. Clique em "Prosseguir para 18.228.193.155"</li>
+                    <li>4. Volte aqui e tente novamente</li>
+                </ol>
+                <div class="flex gap-3">
+                    <button class="btn-cert-help bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://18.228.193.155/health', '_blank')">
+                        🔗 Abrir API
+                    </button>
+                    <button class="btn-close bg-background-dark text-text-dark px-4 py-2 rounded font-bold hover:bg-gray-600 transition-colors">
+                        ✖ Fechar
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Close modal on click
+        modal.querySelector('.btn-close').addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        // Close modal on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+        
+        document.body.appendChild(modal);
     }
     
     // Show notification function
