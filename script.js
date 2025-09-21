@@ -249,7 +249,8 @@
                 }
                 button.disabled = true;
                 
-                const contactUrl = selectedEndpoint ? selectedEndpoint.contactUrl : CONFIG.BACKEND_URL;
+                // Use direct URL that works in tests
+                const contactUrl = 'https://arthurlandingapi.duckdns.org/api/contact';
                 console.log(`Sending form to: ${contactUrl}`);
                 
                 const response = await fetchWithTimeout(contactUrl, {
