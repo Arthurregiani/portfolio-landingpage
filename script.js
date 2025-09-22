@@ -1,6 +1,5 @@
-"use strict";
+'use strict';
 
-// Advanced Profile JavaScript
 (function() {
 
     // Matrix effect
@@ -178,7 +177,8 @@
             const originalText = button.innerHTML;
             
             try {
-                const result = await submitFormWithRetry(data, button);
+                // Use simple direct approach like the test page
+                const result = await submitFormDirect(data, button);
                 
                 if (result.success) {
                     button.innerHTML = `<span class="relative z-10">${CONFIG.MESSAGES.SUCCESS}</span>`;
@@ -194,16 +194,67 @@
                 
                 if (error.name === 'AbortError') {
                     showNotification('❌ Tempo limite excedido. O servidor pode estar inicializando.', 'error');
+                } else if (error.message.includes('certificate') || error.message.includes('NetworkError')) {
+                    showTroubleshootingHelp(error);
                 } else {
                     showNotification('❌ Erro ao enviar mensagem. Tente novamente.', 'error');
                 }
-            } finally {
+            }
                 setTimeout(() => {
                     button.innerHTML = originalText;
                     button.disabled = false;
                 }, 3000);
             }
         });
+    }
+    
+    // Simple direct form submission (same logic as working test page)
+    async function submitFormDirect(data, button) {
+        const endpoints = [
+            'https://arthurlandingapi.duckdns.org/api/contact',
+            'https://18.228.193.155/api/contact'
+        ];
+        
+        button.innerHTML = `<span class="relative z-10">$ enviando...</span>`;
+        button.disabled = true;
+        
+        // Try each endpoint until one works
+        for (let i = 0; i < endpoints.length; i++) {
+            const endpoint = endpoints[i];
+            const endpointName = i === 0 ? 'DuckDNS + Let\'s Encrypt' : 'Direct IP + Self-signed';
+            
+            try {
+                console.log(`Trying ${endpointName}: ${endpoint}`);
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    console.warn(`${endpointName} failed with status ${response.status}`);
+                    continue; // Try next endpoint
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Success with ${endpointName}:`, result);
+                return result;
+                
+            } catch (error) {
+                console.error(`${endpointName} failed:`, error.message);
+                
+                if (i === endpoints.length - 1) {
+                    // Last endpoint failed, throw error
+                    throw new Error(`Todos os endpoints falharam. Último erro: ${error.message}`);
+                }
+                // Continue to next endpoint
+            }
+        }
+        
+        throw new Error('Nenhum endpoint funcionou');
     }
     
     // Smart endpoint selection with automatic fallback
@@ -355,197 +406,90 @@
                 <ul class="text-text-dark text-sm mb-4 space-y-1">
                     <li>• Tente recarregar a página (Ctrl+F5)</li>
                     <li>• Limpe o cache do navegador</li>
-                    <li>• Verifique se não há extensões bloqueando</li>
+                    <li>• Verifique a data e hora do seu sistema</li>
+                    <li>• Tente em outro navegador ou dispositivo</li>
                 </ul>
             `;
         }
         
         modal.innerHTML = `
-            <div class="bg-background-secondary rounded-xl p-6 max-w-md mx-auto glass-strong">
+            <div class="bg-background-secondary p-8 rounded-lg shadow-lg max-w-md w-full relative border border-accent-cyan">
+                <button class="absolute top-3 right-3 text-text-dark hover:text-accent-cyan text-2xl" onclick="this.closest('.troubleshoot-modal').remove()">×</button>
                 ${troubleshootContent}
-                <div class="bg-background-dark rounded p-3 mb-4">
-                    <p class="text-xs font-mono text-accent-green">Erro técnico:</p>
-                    <p class="text-xs font-mono text-text-dark">${error.message}</p>
-                </div>
-                <div class="flex gap-3">
-                    <button class="btn-test-api bg-accent-cyan text-background-dark px-4 py-2 rounded font-bold hover:bg-accent-blue transition-colors" onclick="window.open('https://arthurlandingapi.duckdns.org/health', '_blank')">
-                        🔗 Testar API
-                    </button>
-                    <button class="btn-reload bg-accent-green text-background-dark px-4 py-2 rounded font-bold hover:bg-green-600 transition-colors" onclick="location.reload(true)">
-                        🔄 Recarregar
-                    </button>
-                    <button class="btn-close bg-background-dark text-text-dark px-4 py-2 rounded font-bold hover:bg-gray-600 transition-colors">
-                        ✖ Fechar
-                    </button>
-                </div>
+                <p class="text-text-dark text-xs mt-4">Detalhes do erro: ${error.message}</p>
+                <a href="https://github.com/Arthurregiani/portfolio-landingpage/blob/main/TESTING_GUIDE.md" target="_blank" class="text-accent-blue hover:underline text-sm mt-2 block">Guia de Testes e Solução de Problemas</a>
             </div>
         `;
-        
-        // Close modal on click
-        modal.querySelector('.btn-close').addEventListener('click', () => {
-            modal.remove();
-        });
-        
-        // Close modal on backdrop click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-        
         document.body.appendChild(modal);
     }
-    
-    // Show notification function
-    function showNotification(message, type = 'info') {
-        // Remove existing notifications
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
-        
-        const notification = document.createElement('div');
-        notification.className = `notification fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg font-mono text-sm max-w-sm transition-all duration-300 transform translate-x-full`;
-        
-        if (type === 'success') {
-            notification.classList.add('bg-accent-green', 'text-background-dark');
-        } else if (type === 'error') {
-            notification.classList.add('bg-red-500', 'text-white');
-        } else {
-            notification.classList.add('bg-accent-cyan', 'text-background-dark');
+
+    // Show notification
+    function showNotification(message, type) {
+        const notificationContainer = document.getElementById('notification-container');
+        if (!notificationContainer) {
+            const div = document.createElement('div');
+            div.id = 'notification-container';
+            div.className = 'fixed bottom-5 right-5 z-50 space-y-2';
+            document.body.appendChild(div);
+            notificationContainer = document.getElementById('notification-container');
         }
-        
+
+        const notification = document.createElement('div');
+        notification.className = `p-4 rounded-lg shadow-md text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
         notification.textContent = message;
-        document.body.appendChild(notification);
-        
-        // Animate in
+        notificationContainer.appendChild(notification);
+
         setTimeout(() => {
-            notification.classList.remove('translate-x-full');
-        }, 100);
-        
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            notification.classList.add('translate-x-full');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
+            notification.remove();
         }, 5000);
     }
 
-    // Glitch effect for skill tags
-    function initSkillTagGlitch() {
-        const skillTags = document.querySelectorAll(".skill-tag");
-        skillTags.forEach(tag => {
-            const originalText = tag.textContent;
-            // Criar um span para o texto dentro da tag para controlar melhor o conteúdo
-            const textSpan = document.createElement('span');
-            textSpan.textContent = originalText;
-            tag.innerHTML = ''; // Limpa o conteúdo original
-            tag.appendChild(textSpan);
-
-            tag.addEventListener("mouseover", () => {
-                if (tag.classList.contains("glitch-active")) return; // Prevent re-triggering if already active
-                tag.classList.add("glitch-active");
-                textSpan.classList.add("glitch-effect"); // Aplica o glitch ao span interno
-                let glitchInterval = setInterval(() => {
-                    let glitchText = "";
-                    for (let i = 0; i < originalText.length; i++) {
-                        glitchText += Math.random() < 0.5 ? originalText[i] : String.fromCharCode(33 + Math.floor(Math.random() * 94));
-                    }
-                    textSpan.textContent = glitchText;
-                }, 50);
-
-                const mouseOutHandler = () => {
-                    clearInterval(glitchInterval);
-                    textSpan.textContent = originalText;
-                    // Remove a classe glitch-effect após um pequeno atraso para permitir que a animação CSS termine
-                    setTimeout(() => {
-                        textSpan.classList.remove("glitch-effect");
-                    }, 300); // Duração da animação glitch CSS
-                    tag.classList.remove("glitch-active");
-                    tag.removeEventListener("mouseout", mouseOutHandler);
-                };
-                tag.addEventListener("mouseout", mouseOutHandler);
-            });
-        });
-    }
-
-    // Add glitch effect on random intervals for titles
-    function initRandomGlitchEffect() {
-        setInterval(() => {
-            const elements = document.querySelectorAll("h1, h2");
-            if (elements.length === 0) return;
-            
-            const randomElement = elements[Math.floor(Math.random() * elements.length)];
-            randomElement.classList.add("glitch-effect");
-            setTimeout(() => {
-                randomElement.classList.remove("glitch-effect");
-            }, 300);
-        }, 10000);
-    }
-    
-    // Keep-alive mechanism to prevent server cold starts
-    function initKeepAlive() {
-        if (!CONFIG.KEEP_ALIVE_ENABLED) return;
-        
-        console.log('🔄 Keep-alive ativado - ping a cada', CONFIG.KEEP_ALIVE_INTERVAL / 1000 / 60, 'minutos');
-        
-        const pingServer = async () => {
-            try {
-                const response = await fetchWithTimeout(CONFIG.HEALTH_CHECK_URL, {
-                    method: 'GET',
-                    headers: { 'Cache-Control': 'no-cache' }
-                }, 10000); // 10 second timeout for keep-alive
-                
-                if (response.ok) {
-                    console.log('🟢 Keep-alive ping successful');
-                } else {
-                    console.warn('🟡 Keep-alive ping failed:', response.status);
-                }
-            } catch (error) {
-                console.warn('🟡 Keep-alive ping error:', error.message);
+    // Initialize all effects and functionalities
+    document.addEventListener('DOMContentLoaded', () => {
+        // Remover classes loading imediatamente para elementos críticos
+        const criticalElements = document.querySelectorAll('.loading');
+        criticalElements.forEach(el => {
+            // Adicione aqui os seletores para os elementos que você considera críticos e devem ser visíveis imediatamente
+            // Por exemplo, se o header e o título principal devem ser visíveis:
+            if (el.closest('header') || el.querySelector('.hero-title')) {
+                el.classList.remove('loading');
+                el.classList.add('loaded');
             }
-        };
-        
-        // Initial ping after 1 minute (let page load first)
-        setTimeout(pingServer, 60000);
-        
-        // Set up regular interval
-        setInterval(pingServer, CONFIG.KEEP_ALIVE_INTERVAL);
-    }
+        });
 
-    // Initialize everything when DOM is loaded
-    function init() {
-        // Start effects
-        createMatrix();
-        createParticles();
-        typeWriter();
-        
-        // Observe loading elements
-        const loadingElements = document.querySelectorAll('.loading');
-        loadingElements.forEach(el => observer.observe(el));
-        
-        // Remove loading class from body
-        setTimeout(() => {
-            document.body.classList.remove('loading');
-            document.body.classList.add('loaded');
-        }, 100);
-        
-        // Initialize interactions
+        // Inicializar efeitos apenas se elementos existirem
+        if (document.getElementById('matrix')) {
+            createMatrix();
+        }
+        if (document.getElementById('particles')) {
+            createParticles();
+        }
+        if (document.getElementById('typed-text')) {
+            typeWriter();
+        }
         initSmoothScrolling();
         initParallaxEffect();
         initHeaderScrollEffect();
         initFormSubmission();
-        initSkillTagGlitch();
-        initRandomGlitchEffect();
-        initKeepAlive();
-    }
 
-    // Wait for DOM to be ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+        // Observe elementos para animações
+        document.querySelectorAll('.fade-in-up, .fade-in-left, .fade-in-right, .scale-in').forEach(el => {
+            observer.observe(el);
+        });
+    });
 
 })();
+
+// Verificação de fallback caso recursos não carreguem
+window.addEventListener('load', function() {
+    // Se após 2 segundos ainda houver elementos loading, remover as classes
+    setTimeout(function() {
+        const loadingElements = document.querySelectorAll('.loading');
+        loadingElements.forEach(function(el) {
+            el.classList.remove('loading');
+            el.classList.add('loading-fallback');
+        });
+    }, 2000);
+});
+
+

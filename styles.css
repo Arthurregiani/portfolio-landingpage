@@ -522,3 +522,43 @@ html {
 .bg-diagonal-stripes {
     background-image: repeating-linear-gradient(45deg, var(--solar-cyan) 0px, var(--solar-cyan) 1px, transparent 1px, transparent 20px);
 }
+
+
+/* Fallback para elementos críticos caso JavaScript falhe */
+.loading-fallback {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+}
+
+/* Garantir que o body seja visível */
+body {
+    background-color: #002b36 !important;
+    color: #93a1a1 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Header sempre visível */
+header {
+    background: rgba(7, 54, 66, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* Texto principal sempre visível */
+.hero-title {
+    color: #eee8d5 !important;
+    font-size: 3rem !important;
+    font-weight: bold !important;
+}
+
+/* Links de navegação sempre visíveis */
+nav a {
+    color: #93a1a1 !important;
+    text-decoration: none !important;
+}
+
+nav a:hover {
+    color: #2aa198 !important;
+}
+
+
